@@ -109,24 +109,51 @@
 			var geometry = new THREE.PlaneBufferGeometry( 100, 100, terrainWidth - 1, terrainDepth - 1 );
 			geometry.rotateX( -Math.PI / 2 );
 			var vertices = geometry.attributes.position.array;
+			geometry.addAttribute( 'color', new THREE.BufferAttribute( new Float32Array(vertices.length), 3) );
+			var colors = geometry.attributes.color.array;
+			//var colors = geometry.attributes.color.array;
+			
 			for ( var i = 0, j = 0, l = vertices.length; i < l; i++, j += 3 ) {
 				// j + 1 because it is the y component that we modify
 				vertices[ j + 1 ] = heightData[ i ];
+				//color[j+1] = new THREE.Color(171, 121, 94);
 			}
+
+			var yHigh = 0;
+			var yLow = 0;
+			for (var k = 0; k < colors.length; k += 3){
+				//colors[k] = 3;
+				yHigh = vertices[k+1] > yHigh ? vertices[k+1] : yHigh;
+				yLow = vertices[k+1] < yLow ? vertices[k+1] : yLow;
+				var clrAdd = 10;
+				// Variation in height stays between -8 and 8.
+				var total = 50;
+				var start = vertices[k+1] + 8;
+				var range = 16;
+				clrAdd -= (total / range) * start;
+				// Clr lo = 30
+				// Clr hi = -40
+				colors[k]   = (171 + clrAdd) / 255;
+				colors[k+1] = (121 + clrAdd) / 255;
+				colors[k+2] = (94  + clrAdd) / 255;
+			}
+			//console.log("vertex y high: " + yHigh + " vertex yLow: " + yLow);
+			geometry.attributes.color.needsUpdate = true;
 			geometry.computeVertexNormals();
-			var groundMaterial = new THREE.MeshPhongMaterial( { color: "rgb(171, 121, 94)", shading: THREE.FlatShading, shininess: 0 } );
+			var groundMaterial = new THREE.MeshPhongMaterial( { 
+				//color: "rgb(171, 121, 94)", 
+				shading: THREE.FlatShading, 
+				shininess: 0,
+				vertexColors: THREE.VertexColors
+			} );
 			terrainMesh = new THREE.Mesh( geometry, groundMaterial );
+			//console.log(terrainMesh);
 			terrainMesh.receiveShadow = true;
 			terrainMesh.castShadow = true;
 			scene.add( terrainMesh );
-			//var textureLoader = new THREE.TextureLoader();
-			//textureLoader.load("textures/grid.png", function ( texture ) {
-			//	texture.wrapS = THREE.RepeatWrapping;
-			//	texture.wrapT = THREE.RepeatWrapping;
-			//	texture.repeat.set( terrainWidth - 1, terrainDepth - 1 );
-			//	groundMaterial.map = texture;
-			//	groundMaterial.needsUpdate = true;
-			//});
+
+			console.log(terrainMesh);
+			
 			var light = new THREE.DirectionalLight( 0xffffff, .8 );
 			light.position.set( 100, 100, 50 );
 			light.castShadow = true;
@@ -227,21 +254,10 @@
 					var distance = middle.distanceTo(pos);
 					if(distance < radius){
 						var normDist =  Math.PI + (distance / radius) * (Math.PI/2);
-
-						// divide the norm distance to the range
-						//normDist = normDist * (range / (2 * Math.PI));
-				
-						// offset the divd & normed range
-						//normDist += offset;
 				
 						// Get the value by passing it in cos or sin or something
 						var height = Math.cos(normDist);
 						height *= maxCraterDepth;
-						//height += maxHeight;
-						//height += 1;
-						//height *= 5;
-						//height -= 2;
-						//height += 1.001;
 						maxLo = height < maxLo ? height : maxLo;
 						maxHi = height > maxHi ? height : maxHi;
 	
@@ -257,15 +273,8 @@
 				}
 			}
 
-			// for( i = 0; i < size; i++ ){
-			// 	if(isNaN(data[i])){
-			// 		console.log(data[i]);
-			// 		data[i] = data[i-1];
-			// 	}
-			// }
-
-			console.log("Crater creator:");
-			console.log("Max height: " + maxHi + " max low: " + maxLo);
+			//console.log("Crater creator:");
+			//console.log("Max height: " + maxHi + " max low: " + maxLo);
 			return data;
 		}
 		function generateHeight( width, depth, minHeight, maxHeight ) {
