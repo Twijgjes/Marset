@@ -32,6 +32,7 @@
 		<script src="js/controls/OrbitControls.js"></script>
     	<script src="js/libs/Detector.js"></script>
 		<script src="js/libs/stats.min.js"></script>
+		<script src="js/libs/dat.gui.js"></script>
 
         <script>
 		// Detects webgl
@@ -43,12 +44,9 @@
 		// Heightfield parameters
 		var terrainWidthExtents = 100;
 		var terrainDepthExtents = 100;
-		var terrainWidth = 256;
-		var terrainDepth = 256;
-		var terrainHalfWidth = terrainWidth / 2;
-		var terrainHalfDepth = terrainDepth / 2;
-		var terrainMaxHeight = 8;
-		var terrainMinHeight = -2;
+		
+		
+		
 		// Graphics variables
 		var container, stats;
 		var camera, controls, scene, renderer;
@@ -69,21 +67,50 @@
 		var objectTimePeriod = 3;
 		var timeNextSpawn = time + objectTimePeriod;
 		var maxNumObjects = 30;
+
+		// Dat.gui terrain generation variables
+		var terrainWidth = 256;
+		var terrainDepth = 256;
+		var terrainMaxHeight = 8;
+		var terrainMinHeight = -2;
+		var terrainHalfWidth = terrainWidth / 2;
+		var terrainHalfDepth = terrainDepth / 2;
+
+		var GuiFunctions = function(){
+			this.regenerate = function(){
+				scene.remove(terrainMesh);
+				generateTerrainData();
+				initTerrainMesh();
+			};
+			this.removeTerrain = function(){
+				scene.remove(terrainMesh);
+			};
+			this.test = function(){
+				alert('Hallo?');
+			};
+		}
+
+		window.onload = function(){
+			var guiFunctions = new GuiFunctions();
+			var gui = new dat.GUI();
+			
+			gui.add(guiFunctions, 'regenerate');
+			gui.add(guiFunctions, 'removeTerrain');
+			gui.add(guiFunctions, 'test');
+		}
+
+		window.addEventListener('keydown', function(event){ 
+			console.log(event);
+			if(event.key == 'r'){
+				console.log('derp');
+			}
+		});
+
 		// - Main code -
 		init();
 		animate();
 		function init() {
-			//heightData = generateHeight( terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight );
-			var data = new Float32Array(terrainWidth * terrainDepth);
-
-			// Pretty convincing!
-			//heightData = generateCraters( data, 3000, terrainWidth, terrainDepth, false, 10, 100, 15 );
-
-			// Even more convincing!
-			//heightData = generateCraters( data, 1500, terrainWidth, terrainDepth, false, 20, 75, 15 );
-
-			heightData = generateCraters( data, 1500, terrainWidth, terrainDepth, false, 20, 75, 15 );
-			//heightData = generateCraters( data, 100, terrainWidth, terrainDepth, true );
+			generateTerrainData();
 			initGraphics();
 			initPhysics();
 		}
@@ -106,6 +133,43 @@
 			camera.position.z = terrainDepthExtents / 2;
 			camera.lookAt( new THREE.Vector3( 0, 0, 0 ) );
 			controls = new THREE.OrbitControls( camera );
+
+			initTerrainMesh();
+
+			var light = new THREE.DirectionalLight( 0xffffff, .8 );
+			light.position.set( 100, 100, 50 );
+			light.castShadow = true;
+			var dLight = 200;
+			var sLight = dLight * 0.25;
+			light.shadow.camera.left = -sLight;
+			light.shadow.camera.right = sLight;
+			light.shadow.camera.top = sLight;
+			light.shadow.camera.bottom = -sLight;
+			light.shadow.camera.near = dLight / 30;
+			light.shadow.camera.far = dLight;
+			light.shadow.mapSize.x = 1024 * 2;
+			light.shadow.mapSize.y = 1024 * 2;
+			scene.add(light);
+			var ambientLight = new THREE.AmbientLight( 0xffffff, .4 ); // soft white light
+			scene.add( ambientLight );
+			window.addEventListener( 'resize', onWindowResize, false );
+		}
+
+		function generateTerrainData(){
+			//heightData = generateHeight( terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight );
+			var data = new Float32Array(terrainWidth * terrainDepth);
+
+			// Pretty convincing!
+			//heightData = generateCraters( data, 3000, terrainWidth, terrainDepth, false, 10, 100, 15 );
+
+			// Even more convincing!
+			//heightData = generateCraters( data, 1500, terrainWidth, terrainDepth, false, 20, 75, 15 );
+
+			heightData = generateCraters( data, 1500, terrainWidth, terrainDepth, false, 20, 75, 15 );
+			//heightData = generateCraters( data, 100, terrainWidth, terrainDepth, true );
+		}
+
+		function initTerrainMesh(){
 			var geometry = new THREE.PlaneBufferGeometry( 100, 100, terrainWidth - 1, terrainDepth - 1 );
 			geometry.rotateX( -Math.PI / 2 );
 			var vertices = geometry.attributes.position.array;
@@ -151,27 +215,8 @@
 			terrainMesh.receiveShadow = true;
 			terrainMesh.castShadow = true;
 			scene.add( terrainMesh );
-
-			console.log(terrainMesh);
-			
-			var light = new THREE.DirectionalLight( 0xffffff, .8 );
-			light.position.set( 100, 100, 50 );
-			light.castShadow = true;
-			var dLight = 200;
-			var sLight = dLight * 0.25;
-			light.shadow.camera.left = -sLight;
-			light.shadow.camera.right = sLight;
-			light.shadow.camera.top = sLight;
-			light.shadow.camera.bottom = -sLight;
-			light.shadow.camera.near = dLight / 30;
-			light.shadow.camera.far = dLight;
-			light.shadow.mapSize.x = 1024 * 2;
-			light.shadow.mapSize.y = 1024 * 2;
-			scene.add(light);
-			var ambientLight = new THREE.AmbientLight( 0xffffff, .4 ); // soft white light
-			scene.add( ambientLight );
-			window.addEventListener( 'resize', onWindowResize, false );
 		}
+
 		function onWindowResize() {
 			camera.aspect = window.innerWidth / window.innerHeight;
 			camera.updateProjectionMatrix();
