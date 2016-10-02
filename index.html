@@ -61,7 +61,7 @@
 		var terrainBody;
 		var dynamicObjects = [];
 		var transformAux1 = new Ammo.btTransform();
-		var heightData = null;
+		//var heightData = null;
 		var ammoHeightData = null;
 		var time = 0;
 		var objectTimePeriod = 3;
@@ -69,18 +69,45 @@
 		var maxNumObjects = 30;
 
 		// Dat.gui terrain generation variables
-		var terrainWidth = 256;
-		var terrainDepth = 256;
-		var terrainMaxHeight = 8;
-		var terrainMinHeight = -2;
-		var terrainHalfWidth = terrainWidth / 2;
-		var terrainHalfDepth = terrainDepth / 2;
+		// var terrainWidth = 256;
+		// var terrainDepth = 256;
+		// var terrainMaxHeight = 8;
+		// var terrainMinHeight = -2;
+		var terrainHalfWidth;
+		var terrainHalfDepth;
 
 		var GuiFunctions = function(){
+			// Variables
+			this.cratersPerSquareUnit = 0.022888;
+			//this.terrainWidth = 256;
+			//this.terrainDepth = 256;
+			this.terrainSize = 256;
+			this.defaultHeight = 15;
+			this.shallowMode = false;
+			this.minRadius = 20;
+			this.maxRadius = 75;
+			this.heightData = null;
+
 			this.regenerate = function(){
+				console.log("Regenerating with: " + 
+					// this.terrainWidth + " " +
+					// this.terrainDepth + " " +
+					this.terrainSize + " " +
+					this.cratersPerSquareUnit + " " +
+					this.defaultHeight + " " +
+					this.shallowMode + " " +
+					this.minRadius + " " +
+					this.maxRadius + " "
+				);
+				this.terrainWidth = Math.floor(this.terrainWidth);
+				this.terrainDepth = Math.floor(this.terrainDepth);
+				this.terrainSize  = Math.floor(this.terrainSize );
+				this.minRadius    = Math.floor(this.minRadius   );
+				this.maxRadius    = Math.floor(this.maxRadius   );
 				scene.remove(terrainMesh);
-				generateTerrainData();
-				initTerrainMesh();
+				this.heightData = generateTerrainData(this.terrainSize, this.terrainSize, this.cratersPerSquareUnit, this.shallowMode, this.minRadius, this.maxRadius, this.defaultHeight);
+				// tWidth, tDepth, cratersPerSqUnit, dampedMode, minRadius, maxRadius, defaultHeight
+				initTerrainMesh(this.heightData, this.terrainSize, this.terrainSize);
 			};
 			this.removeTerrain = function(){
 				scene.remove(terrainMesh);
@@ -90,13 +117,28 @@
 			};
 		}
 
+		var guiFunctions = new GuiFunctions();
+
 		window.onload = function(){
-			var guiFunctions = new GuiFunctions();
+			
 			var gui = new dat.GUI();
 			
+			gui.add(guiFunctions, 'defaultHeight');
+			gui.add(guiFunctions, 'cratersPerSquareUnit', 0, .1);
+			gui.add(guiFunctions, 'minRadius', 1, 300);
+			gui.add(guiFunctions, 'maxRadius', 1, 300);
+			//gui.add(guiFunctions, 'terrainWidth', 16, 2048);
+			//gui.add(guiFunctions, 'terrainDepth', 16, 2048);
+			gui.add(guiFunctions, 'terrainSize', 16, 2048);
+
+			gui.add(guiFunctions, 'shallowMode');
 			gui.add(guiFunctions, 'regenerate');
 			gui.add(guiFunctions, 'removeTerrain');
 			gui.add(guiFunctions, 'test');
+
+			// - Main code -
+			init();
+			animate();
 		}
 
 		window.addEventListener('keydown', function(event){ 
@@ -106,15 +148,37 @@
 			}
 		});
 
-		// - Main code -
-		init();
-		animate();
+		
 		function init() {
-			generateTerrainData();
-			initGraphics();
-			initPhysics();
+			guiFunctions.heightData = generateTerrainData(
+				//guiFunctions.heightData,
+				guiFunctions.terrainSize, 
+				guiFunctions.terrainSize, 
+				guiFunctions.cratersPerSquareUnit, 
+				guiFunctions.shallowMode, 
+				guiFunctions.minRadius, 
+				guiFunctions.maxRadius, 
+				guiFunctions.defaultHeight
+			);
+			initGraphics(
+				guiFunctions.heightData,
+				guiFunctions.terrainSize, 
+				guiFunctions.terrainSize, 
+				-guiFunctions.defaultHeight, 
+				guiFunctions.defaultHeight
+			);
+			initPhysics(
+				guiFunctions.heightData,
+				guiFunctions.terrainSize, 
+				guiFunctions.terrainSize, 
+				-guiFunctions.defaultHeight, 
+				guiFunctions.defaultHeight
+			);
 		}
-		function initGraphics() {
+		function initGraphics(hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight) {
+			var terrainHalfWidth = terrainWidth / 2;
+			var terrainHalfDepth = terrainDepth / 2;
+
 			container = document.getElementById( 'container' );
 			renderer = new THREE.WebGLRenderer();
 			renderer.setClearColor( 0xbfd1e5 );
@@ -129,12 +193,12 @@
 			container.appendChild( stats.domElement );
 			camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 0.2, 2000 );
 			scene = new THREE.Scene();
-			camera.position.y = heightData[ terrainHalfWidth + terrainHalfDepth * terrainWidth ] * ( terrainMaxHeight - terrainMinHeight ) + 5;
+			camera.position.y = hData[ terrainHalfWidth + terrainHalfDepth * terrainWidth ] * ( terrainMaxHeight - terrainMinHeight ) + 5;
 			camera.position.z = terrainDepthExtents / 2;
 			camera.lookAt( new THREE.Vector3( 0, 0, 0 ) );
 			controls = new THREE.OrbitControls( camera );
 
-			initTerrainMesh();
+			initTerrainMesh(hData, terrainWidth, terrainDepth);
 
 			var light = new THREE.DirectionalLight( 0xffffff, .8 );
 			light.position.set( 100, 100, 50 );
@@ -155,21 +219,23 @@
 			window.addEventListener( 'resize', onWindowResize, false );
 		}
 
-		function generateTerrainData(){
+		function generateTerrainData(tWidth, tDepth, cratersPerSquareUnit, shallowMode, minRadius, maxRadius, defaultHeight){
 			//heightData = generateHeight( terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight );
-			var data = new Float32Array(terrainWidth * terrainDepth);
+			var hData = new Float32Array(tWidth * tDepth);
 
 			// Pretty convincing!
 			//heightData = generateCraters( data, 3000, terrainWidth, terrainDepth, false, 10, 100, 15 );
 
 			// Even more convincing!
 			//heightData = generateCraters( data, 1500, terrainWidth, terrainDepth, false, 20, 75, 15 );
-
-			heightData = generateCraters( data, 1500, terrainWidth, terrainDepth, false, 20, 75, 15 );
+			var cratersN = Math.round(tWidth * tDepth * cratersPerSquareUnit);
+			console.log(cratersN);
+			hData = generateCraters( hData, cratersN, tWidth, tDepth, shallowMode, minRadius, maxRadius, defaultHeight );
+			return hData;
 			//heightData = generateCraters( data, 100, terrainWidth, terrainDepth, true );
 		}
 
-		function initTerrainMesh(){
+		function initTerrainMesh(hData, terrainWidth, terrainDepth){
 			var geometry = new THREE.PlaneBufferGeometry( 100, 100, terrainWidth - 1, terrainDepth - 1 );
 			geometry.rotateX( -Math.PI / 2 );
 			var vertices = geometry.attributes.position.array;
@@ -179,7 +245,7 @@
 			
 			for ( var i = 0, j = 0, l = vertices.length; i < l; i++, j += 3 ) {
 				// j + 1 because it is the y component that we modify
-				vertices[ j + 1 ] = heightData[ i ];
+				vertices[ j + 1 ] = hData[ i ];
 				//color[j+1] = new THREE.Color(171, 121, 94);
 			}
 
@@ -222,7 +288,7 @@
 			camera.updateProjectionMatrix();
 			renderer.setSize( window.innerWidth, window.innerHeight );
 		}
-		function initPhysics() {
+		function initPhysics(hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight) {
 			// Physics configuration
 			collisionConfiguration = new Ammo.btDefaultCollisionConfiguration();
 			dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );
@@ -231,7 +297,7 @@
 			physicsWorld = new Ammo.btDiscreteDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration );
 			physicsWorld.setGravity( new Ammo.btVector3( 0, -6, 0 ) );
 			// Create the terrain body
-			groundShape = this.createTerrainShape( heightData );
+			groundShape = this.createTerrainShape( hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight );
 			var groundTransform = new Ammo.btTransform();
 			groundTransform.setIdentity();
 			// Shifts the terrain, since bullet re-centers it on its bounding box.
@@ -351,7 +417,7 @@
 			console.log("Max height: " + maxHi + " max low: " + maxLo);
 			return data;
 		}
-		function createTerrainShape() {
+		function createTerrainShape( hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight) {
 			// This parameter is not really used, since we are using PHY_FLOAT height data type and hence it is ignored
 			var heightScale = 1;
 			// Up axis = 0 for X, 1 for Y, 2 for Z. Normally 1 = Y is used.
@@ -368,7 +434,7 @@
 			for ( var j = 0; j < terrainDepth; j++ ) {
 				for ( var i = 0; i < terrainWidth; i++ ) {
 					// write 32-bit float data to memory
-					Ammo.HEAPF32[ ammoHeightData + p2 >> 2 ] = heightData[ p ];
+					Ammo.HEAPF32[ ammoHeightData + p2 >> 2 ] = hData[ p ];
 					p++;
 					// 4 bytes/float
 					p2 += 4;
