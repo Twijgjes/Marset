@@ -33,63 +33,13 @@
     	<script src="js/libs/Detector.js"></script>
 		<script src="js/libs/stats.min.js"></script>
 		<script src="js/libs/dat.gui.js"></script>
+		<script src="js/main.js"></script>
 
         <script>
 		// Detects webgl
 		if ( ! Detector.webgl ) {
 			Detector.addGetWebGLMessage();
 			document.getElementById( 'container' ).innerHTML = "";
-		}
-		
-
-		var GuiFunctions = function(){
-			
-		}
-
-		var guiFunctions = new GuiFunctions();
-
-		window.onload = function(){
-			
-			
-
-			// - Main code -
-			init();
-			animate();
-		}
-
-		window.addEventListener('keydown', function(event){ 
-			console.log(event);
-			if(event.key == 'r'){
-				console.log('derp');
-			}
-		});
-
-		
-		function init() {
-			guiFunctions.heightData = generateTerrainData(
-				//guiFunctions.heightData,
-				guiFunctions.terrainSize, 
-				guiFunctions.terrainSize, 
-				guiFunctions.cratersPerSquareUnit, 
-				guiFunctions.shallowMode, 
-				guiFunctions.minRadius, 
-				guiFunctions.maxRadius, 
-				guiFunctions.defaultHeight
-			);
-			initGraphics(
-				guiFunctions.heightData,
-				guiFunctions.terrainSize, 
-				guiFunctions.terrainSize, 
-				-guiFunctions.defaultHeight, 
-				guiFunctions.defaultHeight
-			);
-			initPhysics(
-				guiFunctions.heightData,
-				guiFunctions.terrainSize, 
-				guiFunctions.terrainSize, 
-				-guiFunctions.defaultHeight, 
-				guiFunctions.defaultHeight
-			);
 		}
 		
         </script>

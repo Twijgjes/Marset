@@ -34,8 +34,7 @@ MARSET.Game = function(userSettings) {
   this.controls;
   this.scene;
   this.renderer;
-  this.terrainMesh;
-  this.texture;
+  //this.texture;
   this.clock = new THREE.Clock();
 
   // Physics
@@ -46,13 +45,12 @@ MARSET.Game = function(userSettings) {
 
   // Terrain generator
   this.terrainGenerator;
-  this.terrainMesh;
 
   // Obsolete vvvvv
-  this.time = 0;
-  this.objectTimePeriod = 3;
-  this.timeNextSpawn = time + objectTimePeriod;
-  this.maxNumObjects = 30;
+  // this.time = 0;
+  // this.objectTimePeriod = 3;
+  // this.timeNextSpawn = time + objectTimePeriod;
+  // this.maxNumObjects = 30;
   // this.terrainHalfWidth;
   // this.terrainHalfDepth;
 
@@ -76,10 +74,10 @@ MARSET.Game.prototype = {
 
   init: function() {
     
-    this.guiController = new MARSET.GuiController();
-    this.terrainGenerator = new MARSET.TerrainGenerator(this);
-    initGraphics(this.terrainGenerator);
-    this.physics = new MARSET.Physics(this);
+    this.guiController = new MARSET.GuiController(this);
+    this.initGraphics(this.terrainGenerator);
+    this.terrainGenerator = new MARSET.TerrainGenerator(this, this.guiController);
+    this.physics = new MARSET.Physics(this, this.terrainGenerator, this.guiController);
     
     // Implement later
     /*
@@ -92,9 +90,9 @@ MARSET.Game.prototype = {
 
   },
 
-  initGraphics: function(hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight) {
-    var terrainHalfWidth = terrainWidth / 2;
-    var terrainHalfDepth = terrainDepth / 2;
+  initGraphics: function() {
+    // var terrainHalfWidth = terrainWidth / 2;
+    // var terrainHalfDepth = terrainDepth / 2;
 
     this.container = document.getElementById( 'container' );
     this.renderer = new THREE.WebGLRenderer();
@@ -107,11 +105,13 @@ MARSET.Game.prototype = {
     this.stats = new Stats();
     this.stats.domElement.style.position = 'absolute';
     this.stats.domElement.style.top = '0px';
-    this.container.appendChild( stats.domElement );
+    this.container.appendChild( this.stats.domElement );
     this.camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 0.2, 2000 );
     this.scene = new THREE.Scene();
-    this.camera.position.y = hData[ terrainHalfWidth + terrainHalfDepth * this.terrainWidth ] * ( this.terrainMaxHeight - this.terrainMinHeight ) + 5;
-    this.camera.position.z = this.terrainDepthExtents / 2;
+    // this.camera.position.y = hData[ terrainHalfWidth + terrainHalfDepth * this.terrainWidth ] * ( this.terrainMaxHeight - this.terrainMinHeight ) + 5;
+    // this.camera.position.z = this.terrainDepthExtents / 2;
+    this.camera.position.y = 100;
+    this.camera.position.z = 100;
     this.camera.lookAt( new THREE.Vector3( 0, 0, 0 ) );
     this.controls = new THREE.OrbitControls( this.camera );
 
@@ -129,17 +129,17 @@ MARSET.Game.prototype = {
     light.shadow.camera.far = dLight;
     light.shadow.mapSize.x = 1024 * 2;
     light.shadow.mapSize.y = 1024 * 2;
-    scene.add(light);
+    this.scene.add(light);
     var ambientLight = new THREE.AmbientLight( 0xffffff, .4 ); // soft white light
     this.scene.add( ambientLight );
 
     window.addEventListener( 'resize', this.onWindowResize, false );
-  }
+  },
 
   update: function() {
-    requestAnimationFrame(this.update);
-    render();
-    stats.update();
+    //requestAnimationFrame(this.update.bind(this));
+    //this.render();
+    this.stats.update();
     if(!this.pause){
       /* FPS setup */
       this.fps_now = new Date;
@@ -173,14 +173,12 @@ MARSET.Game.prototype = {
   },
 
   render: function () {
-    var deltaTime = clock.getDelta();
-    this.updatePhysics( deltaTime );
+    var deltaTime = this.clock.getDelta();
+    this.physics.updatePhysics( deltaTime );
     this.controls.update( deltaTime );
-    this.renderer.render( scene, camera );
+    this.renderer.render( this.scene, this.camera );
     this.time += deltaTime;
   },
-
-  
 
   onWindowResize: function() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -226,6 +224,8 @@ MARSET.GuiController = function(game){
   this.minRadius = 20;
   this.maxRadius = 75;
   this.heightData = null;
+  this.terrainMinHeight = -20;
+  this.terrainMaxHeight = 20;
   this.datGui = new dat.GUI();
 
   // TODO: put this in the prototype
@@ -245,13 +245,13 @@ MARSET.GuiController = function(game){
     this.terrainSize  = Math.floor(this.terrainSize );
     this.minRadius    = Math.floor(this.minRadius   );
     this.maxRadius    = Math.floor(this.maxRadius   );
-    scene.remove(terrainMesh);
+    this.game.scene.remove(this.game.terrainGenerator.terrainMesh);
     this.game.terrainGenerator.generateTerrain();
     // tWidth, tDepth, cratersPerSqUnit, dampedMode, minRadius, maxRadius, defaultHeight
-    this.game.initTerrainMesh(this.heightData, this.terrainSize, this.terrainSize);
+    //this.game.terrainGenerator.initTerrainMesh(this.heightData, this.terrainSize, this.terrainSize);
   };
   this.removeTerrain = function(){
-    scene.remove(this.game.terrainMesh);
+    this.game.scene.remove(this.game.terrainMesh);
   };
   this.test = function(){
     alert('Hallo?');
@@ -264,17 +264,17 @@ MARSET.GuiController = function(game){
 MARSET.GuiController.prototype = {
 
   init: function(){
-    this.datGui.add(guiFunctions, 'defaultHeight');
-    this.datGui.add(guiFunctions, 'cratersPerSquareUnit', 0, .1);
-    this.datGui.add(guiFunctions, 'minRadius', 1, 300);
-    this.datGui.add(guiFunctions, 'maxRadius', 1, 300);
+    this.datGui.add(this, 'defaultHeight');
+    this.datGui.add(this, 'cratersPerSquareUnit', 0, .1);
+    this.datGui.add(this, 'minRadius', 1, 300);
+    this.datGui.add(this, 'maxRadius', 1, 300);
     //this.datGui.add(guiFunctions, 'terrainWidth', 16, 2048);
     //this.datGui.add(guiFunctions, 'terrainDepth', 16, 2048);
-    this.datGui.add(guiFunctions, 'terrainSize', 16, 2048);
-    this.datGui.add(guiFunctions, 'shallowMode');
-    this.datGui.add(guiFunctions, 'regenerate');
-    this.datGui.add(guiFunctions, 'removeTerrain');
-    this.datGui.add(guiFunctions, 'test');
+    this.datGui.add(this, 'terrainSize', 16, 2048);
+    this.datGui.add(this, 'shallowMode');
+    this.datGui.add(this, 'regenerate');
+    this.datGui.add(this, 'removeTerrain');
+    this.datGui.add(this, 'test');
   },
 
 }
@@ -283,6 +283,7 @@ MARSET.TerrainGenerator = function(game, settings){
   this.game = game;
   this.settings = settings;
   this.heightData;
+  this.terrainMesh;
   this.generateTerrain();
 }
 
@@ -298,7 +299,7 @@ MARSET.TerrainGenerator.prototype = {
 
     console.log(cratersN);
 
-    generateCraters( 
+    this.generateCraters( 
       this.heightData, 
       cratersN, 
       this.settings.terrainSize, 
@@ -308,7 +309,7 @@ MARSET.TerrainGenerator.prototype = {
       this.settings.maxRadius, 
       this.settings.defaultHeight 
     );
-    initTerrainMesh();
+    this.initTerrainMesh();
   },
 
   initTerrainMesh: function(){
@@ -321,7 +322,7 @@ MARSET.TerrainGenerator.prototype = {
     
     for ( var i = 0, j = 0, l = vertices.length; i < l; i++, j += 3 ) {
       // j + 1 because it is the y component that we modify
-      vertices[ j + 1 ] = hData[ i ];
+      vertices[ j + 1 ] = this.heightData[ i ];
       //color[j+1] = new THREE.Color(171, 121, 94);
     }
 
@@ -352,11 +353,12 @@ MARSET.TerrainGenerator.prototype = {
       shininess: 0,
       vertexColors: THREE.VertexColors
     } );
-    terrainMesh = new THREE.Mesh( geometry, groundMaterial );
+    var terrainMesh = new THREE.Mesh( geometry, groundMaterial );
     //console.log(terrainMesh);
     terrainMesh.receiveShadow = true;
     terrainMesh.castShadow = true;
     this.game.scene.add( terrainMesh );
+    this.terrainMesh = terrainMesh;
   },
 
   generateCraters: function (data, craters, width, depth, shallowMode, minRadius, maxRadius, defaultHeight){
@@ -367,7 +369,7 @@ MARSET.TerrainGenerator.prototype = {
     for ( var c = 0; c < craters; c++ ) {
       var radius = minRadius + Math.random() * (maxRadius - minRadius);
       var dimension = Math.round(radius);
-      var craterData = generateCrater(dimension, dimension, 1 + Math.random() * 2);
+      var craterData = this.generateCrater(dimension, dimension, 1 + Math.random() * 2);
       var x = Math.round( Math.random() * ( width + radius * 2 ) - radius);
       var y = Math.round( Math.random() * ( depth + radius * 2 ) - radius);
       var position = new THREE.Vector2(x, y);
@@ -440,7 +442,12 @@ MARSET.TerrainGenerator.prototype = {
 
 }
 
-MARSET.Physics = function(){
+MARSET.Physics = function(game, terrainGenerator, settings){
+  // Reference variables
+  this.game = game;
+  this.terrainGenerator = terrainGenerator;
+  this.settings = settings;
+
   // Physics variables
   this.collisionConfiguration;
   this.dispatcher;
@@ -465,11 +472,17 @@ MARSET.Physics.prototype = {
     this.physicsWorld = new Ammo.btDiscreteDynamicsWorld( this.dispatcher, this.broadphase, this.solver, this.collisionConfiguration );
     this.physicsWorld.setGravity( new Ammo.btVector3( 0, -6, 0 ) );
     // Create the terrain body
-    groundShape = this.createTerrainShape( hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight );
+    groundShape = this.createTerrainShape( 
+      this.terrainGenerator.heightData, 
+      this.settings.terrainSize, 
+      this.settings.terrainSize, 
+      this.settings.terrainMinHeight, 
+      this.settings.terrainMaxHeight 
+    );
     var groundTransform = new Ammo.btTransform();
     groundTransform.setIdentity();
     // Shifts the terrain, since bullet re-centers it on its bounding box.
-    groundTransform.setOrigin( new Ammo.btVector3( 0, ( terrainMaxHeight + terrainMinHeight ) / 2, 0 ) );
+    groundTransform.setOrigin( new Ammo.btVector3( 0, ( this.settings.terrainMaxHeight + this.settings. terrainMinHeight ) / 2, 0 ) );
     var groundMass = 0;
     var groundLocalInertia = new Ammo.btVector3( 0, 0, 0 );
     var groundMotionState = new Ammo.btDefaultMotionState( groundTransform );
@@ -495,6 +508,10 @@ MARSET.Physics.prototype = {
   },
 
   createTerrainShape: function( hData, terrainWidth, terrainDepth, terrainMinHeight, terrainMaxHeight) {
+    // TODO: remove use for this.
+    var terrainWidthExtents = 100;
+    var terrainDepthExtents = 100;
+
     // This parameter is not really used, since we are using PHY_FLOAT height data type and hence it is ignored
     var heightScale = 1;
     // Up axis = 0 for X, 1 for Y, 2 for Z. Normally 1 = Y is used.
